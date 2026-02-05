@@ -2,7 +2,7 @@
   "name": "TrackIT - Daily Expense Manager",
   "short_name": "TrackIT",
   "description": "Track your daily expenses with ease. Simple, fast, and works offline.",
-  "start_url": "/trackit/",
+  "start_url": "/TracckIT/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#66bb6a",
