@@ -1,8 +1,8 @@
 const CACHE_NAME = 'trackit-v1';
 const urlsToCache = [
-  '/trackit/',
-  '/trackit/index.html',
-  '/trackit/manifest.json'
+  '/TrackIT/',
+  '/TrackIT/index.html',
+  '/TrackIT/manifest.json'
 ];
 
 // Install Service Worker
