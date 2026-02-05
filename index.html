@@ -214,6 +214,76 @@
             flex: 1;
         }
 
+        .view-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 12px 24px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+            width: auto;
+        }
+
+        .tab-btn:hover {
+            color: #66bb6a;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .tab-btn.active {
+            color: #66bb6a;
+            border-bottom-color: #66bb6a;
+        }
+
+        .monthly-group {
+            margin-bottom: 30px;
+        }
+
+        .monthly-header {
+            background: linear-gradient(135deg, #81c784 0%, #66bb6a 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .monthly-header h3 {
+            font-size: 1.2em;
+        }
+
+        .monthly-total {
+            font-size: 1.3em;
+            font-weight: 700;
+        }
+
+        .backup-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .google-drive-btn {
+            background: linear-gradient(135deg, #4285f4 0%, #34a853 100%);
+        }
+
+        .google-drive-btn:hover {
+            box-shadow: 0 5px 15px rgba(66, 133, 244, 0.4);
+        }
+
         @media (max-width: 600px) {
             .form-row {
                 grid-template-columns: 1fr;
@@ -221,6 +291,15 @@
 
             .header h1 {
                 font-size: 2em;
+            }
+
+            .backup-buttons {
+                grid-template-columns: 1fr;
+            }
+
+            .tab-btn {
+                padding: 10px 16px;
+                font-size: 14px;
             }
         }
     </style>
@@ -305,19 +384,18 @@
                 </div>
             </div>
 
-            <button class="secondary-btn" onclick="downloadCSV()">📥 Download CSV</button>
+            <div class="backup-buttons">
+                <button class="secondary-btn" onclick="downloadCSV()">📥 Download CSV</button>
+                <button class="google-drive-btn" onclick="backupToGoogleDrive()">☁️ Backup to Google Drive</button>
+            </div>
         </div>
 
         <div class="card">
-            <h2 style="margin-bottom: 20px;">Expense History</h2>
-            <div class="expense-list" id="expenseList">
-                <div class="empty-state">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <p>No expenses yet. Start tracking your spending!</p>
-                </div>
+            <div class="view-tabs">
+                <button class="tab-btn active" onclick="switchView('all')">All Expenses</button>
+                <button class="tab-btn" onclick="switchView('monthly')">Monthly View</button>
             </div>
+            <div id="expenseList"></div>
         </div>
     </div>
 
@@ -325,9 +403,21 @@
         // Initialize expenses from localStorage
         let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
         let customCategories = JSON.parse(localStorage.getItem('customCategories')) || [];
+        let currentView = 'all'; // 'all' or 'monthly'
 
         // Set today's date as default
         document.getElementById('date').valueAsDate = new Date();
+
+        // Switch between views
+        function switchView(view) {
+            currentView = view;
+            
+            // Update active tab
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            renderExpenses();
+        }
 
         // Show/hide custom category field
         document.getElementById('category').addEventListener('change', function() {
@@ -486,6 +576,17 @@
             // Sort by date (most recent first)
             filteredExpenses.sort((a, b) => new Date(b.date) - new Date(a.date));
 
+            if (currentView === 'monthly') {
+                renderMonthlyView(filteredExpenses);
+            } else {
+                renderAllExpensesView(filteredExpenses);
+            }
+        }
+
+        // Render all expenses in a single list
+        function renderAllExpensesView(filteredExpenses) {
+            const expenseList = document.getElementById('expenseList');
+            
             expenseList.innerHTML = filteredExpenses.map(expense => `
                 <div class="expense-item">
                     <div class="expense-details">
@@ -508,6 +609,71 @@
                     </div>
                 </div>
             `).join('');
+        }
+
+        // Render expenses grouped by month
+        function renderMonthlyView(filteredExpenses) {
+            const expenseList = document.getElementById('expenseList');
+            
+            // Group expenses by month
+            const monthlyGroups = {};
+            
+            filteredExpenses.forEach(expense => {
+                const date = new Date(expense.date);
+                const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                
+                if (!monthlyGroups[monthYear]) {
+                    monthlyGroups[monthYear] = {
+                        expenses: [],
+                        total: 0
+                    };
+                }
+                
+                monthlyGroups[monthYear].expenses.push(expense);
+                monthlyGroups[monthYear].total += expense.amount;
+            });
+
+            // Sort months in descending order
+            const sortedMonths = Object.keys(monthlyGroups).sort().reverse();
+
+            expenseList.innerHTML = sortedMonths.map(monthYear => {
+                const [year, month] = monthYear.split('-');
+                const date = new Date(year, month - 1);
+                const monthName = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                const group = monthlyGroups[monthYear];
+
+                const expensesHTML = group.expenses.map(expense => `
+                    <div class="expense-item">
+                        <div class="expense-details">
+                            <div style="font-weight: 600; margin-bottom: 5px;">
+                                ${expense.description || 'No description'}
+                            </div>
+                            <div class="expense-date">
+                                ${new Date(expense.date).toLocaleDateString('en-US', { 
+                                    weekday: 'short', 
+                                    month: 'short', 
+                                    day: 'numeric' 
+                                })}
+                            </div>
+                            <span class="expense-category">${expense.category}</span>
+                        </div>
+                        <div style="display: flex; align-items: center;">
+                            <div class="expense-amount">₹${expense.amount.toFixed(2)}</div>
+                            <button class="delete-btn" onclick="deleteExpense(${expense.id})">Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+
+                return `
+                    <div class="monthly-group">
+                        <div class="monthly-header">
+                            <h3>${monthName}</h3>
+                            <div class="monthly-total">₹${group.total.toFixed(2)}</div>
+                        </div>
+                        ${expensesHTML}
+                    </div>
+                `;
+            }).join('');
         }
 
         // Update summary
@@ -558,9 +724,63 @@
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `expenses_${new Date().toISOString().split('T')[0]}.csv`;
+            a.download = `trackit_expenses_${new Date().toISOString().split('T')[0]}.csv`;
             a.click();
             window.URL.revokeObjectURL(url);
+        }
+
+        // Backup to Google Drive
+        function backupToGoogleDrive() {
+            const filteredExpenses = getFilteredExpenses();
+            
+            if (filteredExpenses.length === 0) {
+                alert('No expenses to backup!');
+                return;
+            }
+
+            // Sort by date
+            filteredExpenses.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            const headers = ['Date', 'Category', 'Description', 'Amount (₹)'];
+            const rows = filteredExpenses.map(expense => [
+                expense.date,
+                expense.category,
+                expense.description || '',
+                expense.amount.toFixed(2)
+            ]);
+
+            const csv = [
+                headers.join(','),
+                ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+            ].join('\n');
+
+            // Create a data URL
+            const dataStr = encodeURIComponent(csv);
+            const fileName = `TrackIT_Backup_${new Date().toISOString().split('T')[0]}.csv`;
+            
+            // Open Google Drive upload in new tab
+            // Note: This creates a CSV file that the user can then upload to Google Drive manually
+            // For automatic upload, would need Google Drive API authentication
+            
+            const confirmed = confirm('This will download a CSV file that you can upload to Google Drive.\n\nSteps:\n1. Save the CSV file\n2. Go to drive.google.com\n3. Click "New" → "File Upload"\n4. Select the CSV file\n\nClick OK to download the backup file now.');
+            
+            if (confirmed) {
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                a.click();
+                window.URL.revokeObjectURL(url);
+                
+                // Optionally open Google Drive in a new tab
+                setTimeout(() => {
+                    const openDrive = confirm('Backup downloaded! Would you like to open Google Drive now?');
+                    if (openDrive) {
+                        window.open('https://drive.google.com/drive/my-drive', '_blank');
+                    }
+                }, 500);
+            }
         }
 
         // Filter event listeners
