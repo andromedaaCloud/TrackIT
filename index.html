@@ -23,6 +23,11 @@
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
     
+    <!-- Firebase SDK (Compat version for easier use) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
     <style>
         * {
             margin: 0;
@@ -118,6 +123,12 @@
             transform: translateY(0);
         }
 
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .secondary-btn {
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
             margin-top: 10px;
@@ -178,6 +189,7 @@
             cursor: pointer;
             font-size: 0.9em;
             margin-left: 10px;
+            width: auto;
         }
 
         .delete-btn:hover {
@@ -444,6 +456,12 @@
             box-shadow: 0 5px 15px rgba(66, 133, 244, 0.4);
         }
 
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
         @media (max-width: 600px) {
             .form-row {
                 grid-template-columns: 1fr;
@@ -491,7 +509,7 @@
                     <label for="loginPassword">Password</label>
                     <input type="password" id="loginPassword" required placeholder="Enter your password">
                 </div>
-                <button type="submit">Login</button>
+                <button type="submit" id="loginBtn">Login</button>
             </form>
 
             <!-- Signup Form -->
@@ -512,7 +530,7 @@
                     <label for="signupPasswordConfirm">Confirm Password</label>
                     <input type="password" id="signupPasswordConfirm" required placeholder="Re-enter password" minlength="6">
                 </div>
-                <button type="submit">Sign Up</button>
+                <button type="submit" id="signupBtn">Sign Up</button>
             </form>
         </div>
     </div>
@@ -537,23 +555,53 @@
                 </div>
             </div>
 
-        <div class="card">
-            <h2 style="margin-bottom: 20px;">Add New Expense</h2>
-            <form id="expenseForm">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="date">Date</label>
-                        <input type="date" id="date" required>
+            <div class="card">
+                <h2 style="margin-bottom: 20px;">Add New Expense</h2>
+                <form id="expenseForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="date">Date</label>
+                            <input type="date" id="date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="amount">Amount (₹)</label>
+                            <input type="number" id="amount" step="0.01" min="0" required placeholder="0.00">
+                        </div>
                     </div>
                     <div class="form-group">
-                        <label for="amount">Amount (₹)</label>
-                        <input type="number" id="amount" step="0.01" min="0" required placeholder="0.00">
+                        <label for="category">Category</label>
+                        <select id="category" required>
+                            <option value="">Select a category</option>
+                            <option value="Food & Dining">🍔 Food & Dining</option>
+                            <option value="Transportation">🚗 Transportation</option>
+                            <option value="Shopping">🛍️ Shopping</option>
+                            <option value="Entertainment">🎬 Entertainment</option>
+                            <option value="Bills & Utilities">💡 Bills & Utilities</option>
+                            <option value="Health & Fitness">💊 Health & Fitness</option>
+                            <option value="Education">📚 Education</option>
+                            <option value="Other">📦 Other</option>
+                            <option value="custom">✏️ Custom Category</option>
+                        </select>
                     </div>
-                </div>
-                <div class="form-group">
-                    <label for="category">Category</label>
-                    <select id="category" required>
-                        <option value="">Select a category</option>
+                    <div class="form-group" id="customCategoryField" style="display: none;">
+                        <label for="customCategory">Enter Custom Category</label>
+                        <input type="text" id="customCategory" placeholder="e.g., Travel, Gifts, Pet Care">
+                    </div>
+                    <div class="form-group">
+                        <label for="description">Description (Optional)</label>
+                        <input type="text" id="description" placeholder="What did you spend on?">
+                    </div>
+                    <button type="submit" id="addExpenseBtn">Add Expense</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <div class="month-selector">
+                    <select id="monthFilter">
+                        <option value="">All Time</option>
+                    </select>
+                    <select id="categoryFilter">
+                        <option value="">All Categories</option>
                         <option value="Food & Dining">🍔 Food & Dining</option>
                         <option value="Transportation">🚗 Transportation</option>
                         <option value="Shopping">🛍️ Shopping</option>
@@ -562,106 +610,96 @@
                         <option value="Health & Fitness">💊 Health & Fitness</option>
                         <option value="Education">📚 Education</option>
                         <option value="Other">📦 Other</option>
-                        <option value="custom">✏️ Custom Category</option>
                     </select>
                 </div>
-                <div class="form-group" id="customCategoryField" style="display: none;">
-                    <label for="customCategory">Enter Custom Category</label>
-                    <input type="text" id="customCategory" placeholder="e.g., Travel, Gifts, Pet Care">
-                </div>
-                <div class="form-group">
-                    <label for="description">Description (Optional)</label>
-                    <input type="text" id="description" placeholder="What did you spend on?">
-                </div>
-                <button type="submit">Add Expense</button>
-            </form>
-        </div>
 
-        <div class="card">
-            <div class="month-selector">
-                <select id="monthFilter">
-                    <option value="">All Time</option>
-                </select>
-                <select id="categoryFilter">
-                    <option value="">All Categories</option>
-                    <option value="Food & Dining">🍔 Food & Dining</option>
-                    <option value="Transportation">🚗 Transportation</option>
-                    <option value="Shopping">🛍️ Shopping</option>
-                    <option value="Entertainment">🎬 Entertainment</option>
-                    <option value="Bills & Utilities">💡 Bills & Utilities</option>
-                    <option value="Health & Fitness">💊 Health & Fitness</option>
-                    <option value="Education">📚 Education</option>
-                    <option value="Other">📦 Other</option>
-                </select>
-            </div>
+                <div class="summary" id="summary">
+                    <div class="summary-item">
+                        <div class="summary-label">Total Expenses</div>
+                        <div class="summary-value">₹<span id="totalAmount">0.00</span></div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">Number of Transactions</div>
+                        <div class="summary-value"><span id="totalCount">0</span></div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">Average per Day</div>
+                        <div class="summary-value">₹<span id="avgAmount">0.00</span></div>
+                    </div>
+                </div>
 
-            <div class="summary" id="summary">
-                <div class="summary-item">
-                    <div class="summary-label">Total Expenses</div>
-                    <div class="summary-value">₹<span id="totalAmount">0.00</span></div>
-                </div>
-                <div class="summary-item">
-                    <div class="summary-label">Number of Transactions</div>
-                    <div class="summary-value"><span id="totalCount">0</span></div>
-                </div>
-                <div class="summary-item">
-                    <div class="summary-label">Average per Day</div>
-                    <div class="summary-value">₹<span id="avgAmount">0.00</span></div>
+                <div class="backup-buttons">
+                    <button class="secondary-btn" onclick="downloadCSV()">📥 Download CSV</button>
+                    <button class="google-drive-btn" onclick="backupToGoogleDrive()">☁️ Backup to Google Drive</button>
                 </div>
             </div>
 
-            <div class="backup-buttons">
-                <button class="secondary-btn" onclick="downloadCSV()">📥 Download CSV</button>
-                <button class="google-drive-btn" onclick="backupToGoogleDrive()">☁️ Backup to Google Drive</button>
+            <div class="card">
+                <div class="view-tabs">
+                    <button class="tab-btn active" onclick="switchView('all')">All Expenses</button>
+                    <button class="tab-btn" onclick="switchView('monthly')">Monthly View</button>
+                </div>
+                <div id="expenseList">
+                    <div class="loading">Loading expenses...</div>
+                </div>
             </div>
-        </div>
-
-        <div class="card">
-            <div class="view-tabs">
-                <button class="tab-btn active" onclick="switchView('all')">All Expenses</button>
-                <button class="tab-btn" onclick="switchView('monthly')">Monthly View</button>
-            </div>
-            <div id="expenseList"></div>
-        </div>
         </div>
     </div>
 
     <script>
+        // Initialize Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDz7h-ch2T86bXqs6rNDhQOxw_7p7uxAAY",
+            authDomain: "trackit-83c83.firebaseapp.com",
+            projectId: "trackit-83c83",
+            storageBucket: "trackit-83c83.firebasestorage.app",
+            messagingSenderId: "715435896116",
+            appId: "1:715435896116:web:8415fce9e7294c6dbac961"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // Global variables
+        let expenses = [];
+        let customCategories = JSON.parse(localStorage.getItem('customCategories')) || [];
+        let currentView = 'all';
+        let currentUser = null;
+
+        // Set today's date as default
+        document.getElementById('date').valueAsDate = new Date();
+
         // ===== AUTHENTICATION SYSTEM =====
-        
-        // Check if user is logged in
-        function checkAuth() {
-            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-            if (currentUser) {
-                showMainApp(currentUser);
+
+        // Auth state observer
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                currentUser = user;
+                showMainApp(user);
+                loadExpenses();
             } else {
+                currentUser = null;
                 showLoginPage();
             }
-        }
+        });
 
-        // Show login page
         function showLoginPage() {
             document.getElementById('loginPage').style.display = 'flex';
             document.getElementById('mainApp').style.display = 'none';
         }
 
-        // Show main app
         function showMainApp(user) {
             document.getElementById('loginPage').style.display = 'none';
             document.getElementById('mainApp').style.display = 'block';
             
-            // Update user info
-            document.getElementById('userName').textContent = user.name;
+            document.getElementById('userName').textContent = user.displayName || user.email;
             document.getElementById('userEmail').textContent = user.email;
-            document.getElementById('userAvatar').textContent = user.name.charAt(0).toUpperCase();
+            document.getElementById('userAvatar').textContent = (user.displayName || user.email).charAt(0).toUpperCase();
             
-            // Track login event in Google Analytics
-            gtag('event', 'login', {
-                method: 'email'
-            });
+            gtag('event', 'login', { method: 'email' });
         }
 
-        // Switch between login and signup tabs
         function switchAuthTab(tab) {
             const loginForm = document.getElementById('loginForm');
             const signupForm = document.getElementById('signupForm');
@@ -682,7 +720,6 @@
             hideMessages();
         }
 
-        // Show error message
         function showError(message) {
             const errorDiv = document.getElementById('errorMessage');
             errorDiv.textContent = message;
@@ -690,7 +727,6 @@
             setTimeout(() => errorDiv.style.display = 'none', 5000);
         }
 
-        // Show success message
         function showSuccess(message) {
             const successDiv = document.getElementById('successMessage');
             successDiv.textContent = message;
@@ -698,50 +734,45 @@
             setTimeout(() => successDiv.style.display = 'none', 3000);
         }
 
-        // Hide messages
         function hideMessages() {
             document.getElementById('errorMessage').style.display = 'none';
             document.getElementById('successMessage').style.display = 'none';
         }
 
         // Login handler
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             hideMessages();
             
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
+            const btn = document.getElementById('loginBtn');
             
-            // Get all users
-            const users = JSON.parse(localStorage.getItem('users')) || {};
+            btn.disabled = true;
+            btn.textContent = 'Logging in...';
             
-            // Check if user exists
-            if (!users[email]) {
-                showError('Account not found. Please sign up first.');
-                return;
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+                this.reset();
+            } catch (error) {
+                console.error('Login error:', error);
+                if (error.code === 'auth/user-not-found') {
+                    showError('No account found with this email. Please sign up first.');
+                } else if (error.code === 'auth/wrong-password') {
+                    showError('Incorrect password. Please try again.');
+                } else if (error.code === 'auth/invalid-email') {
+                    showError('Invalid email address.');
+                } else {
+                    showError('Login failed: ' + error.message);
+                }
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Login';
             }
-            
-            // Check password
-            if (users[email].password !== password) {
-                showError('Incorrect password. Please try again.');
-                return;
-            }
-            
-            // Login successful
-            const user = {
-                name: users[email].name,
-                email: email
-            };
-            
-            localStorage.setItem('currentUser', JSON.stringify(user));
-            showMainApp(user);
-            
-            // Reset form
-            this.reset();
         });
 
         // Signup handler
-        document.getElementById('signupForm').addEventListener('submit', function(e) {
+        document.getElementById('signupForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             hideMessages();
             
@@ -749,82 +780,93 @@
             const email = document.getElementById('signupEmail').value;
             const password = document.getElementById('signupPassword').value;
             const confirmPassword = document.getElementById('signupPasswordConfirm').value;
+            const btn = document.getElementById('signupBtn');
             
-            // Validate passwords match
             if (password !== confirmPassword) {
                 showError('Passwords do not match!');
                 return;
             }
             
-            // Get all users
-            const users = JSON.parse(localStorage.getItem('users')) || {};
+            btn.disabled = true;
+            btn.textContent = 'Creating account...';
             
-            // Check if user already exists
-            if (users[email]) {
-                showError('Account already exists. Please login.');
-                return;
+            try {
+                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                await userCredential.user.updateProfile({ displayName: name });
+                
+                gtag('event', 'sign_up', { method: 'email' });
+                
+                this.reset();
+                showSuccess('Account created successfully!');
+            } catch (error) {
+                console.error('Signup error:', error);
+                if (error.code === 'auth/email-already-in-use') {
+                    showError('Email already registered. Please login instead.');
+                } else if (error.code === 'auth/weak-password') {
+                    showError('Password is too weak. Please use at least 6 characters.');
+                } else if (error.code === 'auth/invalid-email') {
+                    showError('Invalid email address.');
+                } else {
+                    showError('Sign up failed: ' + error.message);
+                }
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Sign Up';
             }
-            
-            // Create new user
-            users[email] = {
-                name: name,
-                password: password,
-                createdAt: new Date().toISOString()
-            };
-            
-            localStorage.setItem('users', JSON.stringify(users));
-            
-            // Track signup event in Google Analytics
-            gtag('event', 'sign_up', {
-                method: 'email'
-            });
-            
-            showSuccess('Account created successfully! Please login.');
-            
-            // Switch to login tab
-            setTimeout(() => {
-                switchAuthTab('login');
-                document.getElementById('loginEmail').value = email;
-            }, 1500);
-            
-            // Reset form
-            this.reset();
         });
 
-        // Logout function
-        function logout() {
+        // Logout
+        async function logout() {
             if (confirm('Are you sure you want to logout?')) {
-                localStorage.removeItem('currentUser');
-                
-                // Track logout event
-                gtag('event', 'logout');
-                
-                showLoginPage();
+                try {
+                    await auth.signOut();
+                    gtag('event', 'logout');
+                } catch (error) {
+                    console.error('Logout error:', error);
+                    alert('Logout failed. Please try again.');
+                }
             }
         }
 
-        // ===== EXPENSE TRACKER CODE =====
-        
-        // Initialize expenses from localStorage
-        let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
-        let customCategories = JSON.parse(localStorage.getItem('customCategories')) || [];
-        let currentView = 'all'; // 'all' or 'monthly'
+        // ===== EXPENSE MANAGEMENT =====
 
-        // Set today's date as default
-        document.getElementById('date').valueAsDate = new Date();
-
-        // Switch between views
-        function switchView(view) {
-            currentView = view;
+        // Load expenses from Firestore
+        function loadExpenses() {
+            if (!currentUser) return;
             
-            // Update active tab
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
+            const expenseList = document.getElementById('expenseList');
+            expenseList.innerHTML = '<div class="loading">Loading expenses...</div>';
             
-            renderExpenses();
+            // Query without orderBy to avoid index requirement for new databases
+            db.collection('expenses')
+                .where('userId', '==', currentUser.uid)
+                .onSnapshot(snapshot => {
+                    expenses = [];
+                    snapshot.forEach(doc => {
+                        expenses.push({
+                            id: doc.id,
+                            ...doc.data()
+                        });
+                    });
+                    
+                    // Sort in JavaScript instead of Firestore
+                    expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
+                    
+                    updateCategoryFilters();
+                    populateMonthFilter();
+                    renderExpenses();
+                    updateSummary();
+                }, error => {
+                    console.error('Error loading expenses:', error);
+                    if (error.code === 'permission-denied') {
+                        expenseList.innerHTML = '<div class="empty-state"><p>Please set up Firestore security rules. Check FIREBASE_SETUP.md</p></div>';
+                    } else {
+                        expenseList.innerHTML = '<div class="empty-state"><p>Error loading expenses. Please refresh the page.</p></div>';
+                    }
+                });
         }
 
-        // Show/hide custom category field
+        // Custom category handling
         document.getElementById('category').addEventListener('change', function() {
             const customField = document.getElementById('customCategoryField');
             const customInput = document.getElementById('customCategory');
@@ -839,12 +881,79 @@
             }
         });
 
-        // Populate category filters with custom categories
+        // Add expense
+        document.getElementById('expenseForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            if (!currentUser) {
+                alert('Please login first');
+                return;
+            }
+            
+            let categoryValue = document.getElementById('category').value;
+            
+            if (categoryValue === 'custom') {
+                categoryValue = document.getElementById('customCategory').value.trim();
+                
+                if (categoryValue && !customCategories.includes(categoryValue)) {
+                    customCategories.push(categoryValue);
+                    localStorage.setItem('customCategories', JSON.stringify(customCategories));
+                    updateCategoryFilters();
+                }
+            }
+            
+            const expense = {
+                userId: currentUser.uid,
+                date: document.getElementById('date').value,
+                amount: parseFloat(document.getElementById('amount').value),
+                category: categoryValue,
+                description: document.getElementById('description').value,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            
+            const btn = document.getElementById('addExpenseBtn');
+            btn.disabled = true;
+            btn.textContent = 'Adding...';
+            
+            try {
+                await db.collection('expenses').add(expense);
+                
+                gtag('event', 'add_expense', {
+                    category: categoryValue,
+                    amount: expense.amount
+                });
+                
+                this.reset();
+                document.getElementById('date').valueAsDate = new Date();
+                document.getElementById('customCategoryField').style.display = 'none';
+                document.getElementById('customCategory').required = false;
+            } catch (error) {
+                console.error('Error adding expense:', error);
+                alert('Failed to add expense. Please try again.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Add Expense';
+            }
+        });
+
+        // Delete expense
+        async function deleteExpense(id) {
+            if (confirm('Are you sure you want to delete this expense?')) {
+                try {
+                    await db.collection('expenses').doc(id).delete();
+                    gtag('event', 'delete_expense');
+                } catch (error) {
+                    console.error('Error deleting expense:', error);
+                    alert('Failed to delete expense. Please try again.');
+                }
+            }
+        }
+
+        // Update category filters
         function updateCategoryFilters() {
             const categoryFilter = document.getElementById('categoryFilter');
             const currentValue = categoryFilter.value;
             
-            // Rebuild filter options
             categoryFilter.innerHTML = `
                 <option value="">All Categories</option>
                 <option value="Food & Dining">🍔 Food & Dining</option>
@@ -857,7 +966,6 @@
                 <option value="Other">📦 Other</option>
             `;
             
-            // Add custom categories
             customCategories.forEach(cat => {
                 const option = document.createElement('option');
                 option.value = cat;
@@ -879,10 +987,8 @@
                 months.add(monthYear);
             });
 
-            // Clear existing options except "All Time"
             monthFilter.innerHTML = '<option value="">All Time</option>';
             
-            // Sort months in descending order
             Array.from(months).sort().reverse().forEach(monthYear => {
                 const [year, month] = monthYear.split('-');
                 const date = new Date(year, month - 1);
@@ -894,68 +1000,7 @@
             });
         }
 
-        // Add expense
-        document.getElementById('expenseForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            let categoryValue = document.getElementById('category').value;
-            
-            // Handle custom category
-            if (categoryValue === 'custom') {
-                categoryValue = document.getElementById('customCategory').value.trim();
-                
-                // Add to custom categories if not already there
-                if (categoryValue && !customCategories.includes(categoryValue)) {
-                    customCategories.push(categoryValue);
-                    localStorage.setItem('customCategories', JSON.stringify(customCategories));
-                    updateCategoryFilters();
-                }
-            }
-            
-            const expense = {
-                id: Date.now(),
-                date: document.getElementById('date').value,
-                amount: parseFloat(document.getElementById('amount').value),
-                category: categoryValue,
-                description: document.getElementById('description').value
-            };
-
-            expenses.push(expense);
-            localStorage.setItem('expenses', JSON.stringify(expenses));
-            
-            // Track expense added in Google Analytics
-            gtag('event', 'add_expense', {
-                category: categoryValue,
-                amount: expense.amount
-            });
-            
-            // Reset form
-            this.reset();
-            document.getElementById('date').valueAsDate = new Date();
-            document.getElementById('customCategoryField').style.display = 'none';
-            document.getElementById('customCategory').required = false;
-            
-            populateMonthFilter();
-            renderExpenses();
-            updateSummary();
-        });
-
-        // Delete expense
-        function deleteExpense(id) {
-            if (confirm('Are you sure you want to delete this expense?')) {
-                expenses = expenses.filter(expense => expense.id !== id);
-                localStorage.setItem('expenses', JSON.stringify(expenses));
-                
-                // Track delete event
-                gtag('event', 'delete_expense');
-                
-                populateMonthFilter();
-                renderExpenses();
-                updateSummary();
-            }
-        }
-
-        // Filter expenses
+        // Get filtered expenses
         function getFilteredExpenses() {
             const monthFilter = document.getElementById('monthFilter').value;
             const categoryFilter = document.getElementById('categoryFilter').value;
@@ -971,6 +1016,16 @@
             });
         }
 
+        // Switch view
+        function switchView(view) {
+            currentView = view;
+            
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            renderExpenses();
+        }
+
         // Render expenses
         function renderExpenses() {
             const expenseList = document.getElementById('expenseList');
@@ -982,13 +1037,12 @@
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        <p>No expenses found for the selected filters.</p>
+                        <p>No expenses found.</p>
                     </div>
                 `;
                 return;
             }
 
-            // Sort by date (most recent first)
             filteredExpenses.sort((a, b) => new Date(b.date) - new Date(a.date));
 
             if (currentView === 'monthly') {
@@ -998,7 +1052,6 @@
             }
         }
 
-        // Render all expenses in a single list
         function renderAllExpensesView(filteredExpenses) {
             const expenseList = document.getElementById('expenseList');
             
@@ -1020,17 +1073,15 @@
                     </div>
                     <div style="display: flex; align-items: center;">
                         <div class="expense-amount">₹${expense.amount.toFixed(2)}</div>
-                        <button class="delete-btn" onclick="deleteExpense(${expense.id})">Delete</button>
+                        <button class="delete-btn" onclick="deleteExpense('${expense.id}')">Delete</button>
                     </div>
                 </div>
             `).join('');
         }
 
-        // Render expenses grouped by month
         function renderMonthlyView(filteredExpenses) {
             const expenseList = document.getElementById('expenseList');
             
-            // Group expenses by month
             const monthlyGroups = {};
             
             filteredExpenses.forEach(expense => {
@@ -1048,7 +1099,6 @@
                 monthlyGroups[monthYear].total += expense.amount;
             });
 
-            // Sort months in descending order
             const sortedMonths = Object.keys(monthlyGroups).sort().reverse();
 
             expenseList.innerHTML = sortedMonths.map(monthYear => {
@@ -1074,7 +1124,7 @@
                         </div>
                         <div style="display: flex; align-items: center;">
                             <div class="expense-amount">₹${expense.amount.toFixed(2)}</div>
-                            <button class="delete-btn" onclick="deleteExpense(${expense.id})">Delete</button>
+                            <button class="delete-btn" onclick="deleteExpense('${expense.id}')">Delete</button>
                         </div>
                     </div>
                 `).join('');
@@ -1097,7 +1147,6 @@
             const total = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
             const count = filteredExpenses.length;
             
-            // Calculate average per day
             let avgPerDay = 0;
             if (filteredExpenses.length > 0) {
                 const dates = filteredExpenses.map(e => new Date(e.date).toDateString());
@@ -1119,7 +1168,6 @@
                 return;
             }
 
-            // Sort by date
             filteredExpenses.sort((a, b) => new Date(a.date) - new Date(b.date));
 
             const headers = ['Date', 'Category', 'Description', 'Amount'];
@@ -1143,7 +1191,6 @@
             a.click();
             window.URL.revokeObjectURL(url);
             
-            // Track download event
             gtag('event', 'download_csv', {
                 expense_count: filteredExpenses.length
             });
@@ -1158,7 +1205,6 @@
                 return;
             }
 
-            // Sort by date
             filteredExpenses.sort((a, b) => new Date(a.date) - new Date(b.date));
 
             const headers = ['Date', 'Category', 'Description', 'Amount (₹)'];
@@ -1174,13 +1220,7 @@
                 ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
             ].join('\n');
 
-            // Create a data URL
-            const dataStr = encodeURIComponent(csv);
             const fileName = `TrackIT_Backup_${new Date().toISOString().split('T')[0]}.csv`;
-            
-            // Open Google Drive upload in new tab
-            // Note: This creates a CSV file that the user can then upload to Google Drive manually
-            // For automatic upload, would need Google Drive API authentication
             
             const confirmed = confirm('This will download a CSV file that you can upload to Google Drive.\n\nSteps:\n1. Save the CSV file\n2. Go to drive.google.com\n3. Click "New" → "File Upload"\n4. Select the CSV file\n\nClick OK to download the backup file now.');
             
@@ -1193,12 +1233,10 @@
                 a.click();
                 window.URL.revokeObjectURL(url);
                 
-                // Track backup event
                 gtag('event', 'backup_google_drive', {
                     expense_count: filteredExpenses.length
                 });
                 
-                // Optionally open Google Drive in a new tab
                 setTimeout(() => {
                     const openDrive = confirm('Backup downloaded! Would you like to open Google Drive now?');
                     if (openDrive) {
@@ -1218,15 +1256,6 @@
             renderExpenses();
             updateSummary();
         });
-
-        // Initial render
-        updateCategoryFilters();
-        populateMonthFilter();
-        renderExpenses();
-        updateSummary();
-
-        // Check authentication status on page load
-        checkAuth();
 
         // Register Service Worker for PWA
         if ('serviceWorker' in navigator) {
