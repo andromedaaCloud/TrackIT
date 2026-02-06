@@ -675,9 +675,16 @@
         // Auth state observer
         auth.onAuthStateChanged(user => {
             if (user) {
-                currentUser = user;
-                showMainApp(user);
-                loadExpenses();
+                // Verify the user is actually authenticated with Firebase
+                auth.currentUser.getIdToken(true).then(() => {
+                    currentUser = user;
+                    showMainApp(user);
+                    loadExpenses();
+                }).catch(error => {
+                    console.error('Auth verification failed:', error);
+                    auth.signOut();
+                    showLoginPage();
+                });
             } else {
                 currentUser = null;
                 showLoginPage();
@@ -832,21 +839,30 @@
 
         // Load expenses from Firestore
         function loadExpenses() {
-            if (!currentUser) return;
+            // Double check authentication
+            if (!currentUser || !auth.currentUser) {
+                console.error('No authenticated user');
+                showLoginPage();
+                return;
+            }
             
             const expenseList = document.getElementById('expenseList');
             expenseList.innerHTML = '<div class="loading">Loading expenses...</div>';
             
             // Query without orderBy to avoid index requirement for new databases
             db.collection('expenses')
-                .where('userId', '==', currentUser.uid)
+                .where('userId', '==', auth.currentUser.uid) // Use auth.currentUser for security
                 .onSnapshot(snapshot => {
                     expenses = [];
                     snapshot.forEach(doc => {
-                        expenses.push({
-                            id: doc.id,
-                            ...doc.data()
-                        });
+                        const data = doc.data();
+                        // Verify userId matches current user (double security check)
+                        if (data.userId === auth.currentUser.uid) {
+                            expenses.push({
+                                id: doc.id,
+                                ...data
+                            });
+                        }
                     });
                     
                     // Sort in JavaScript instead of Firestore
@@ -859,7 +875,9 @@
                 }, error => {
                     console.error('Error loading expenses:', error);
                     if (error.code === 'permission-denied') {
-                        expenseList.innerHTML = '<div class="empty-state"><p>Please set up Firestore security rules. Check FIREBASE_SETUP.md</p></div>';
+                        expenseList.innerHTML = '<div class="empty-state"><p>Permission denied. Please set up Firestore security rules. Check FIREBASE_SETUP.md</p></div>';
+                        // Force logout on permission denied
+                        setTimeout(() => logout(), 3000);
                     } else {
                         expenseList.innerHTML = '<div class="empty-state"><p>Error loading expenses. Please refresh the page.</p></div>';
                     }
@@ -885,8 +903,17 @@
         document.getElementById('expenseForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            if (!currentUser) {
-                alert('Please login first');
+            // CRITICAL: Verify user is actually authenticated
+            if (!currentUser || !auth.currentUser) {
+                alert('Authentication error. Please logout and login again.');
+                logout();
+                return;
+            }
+            
+            // Verify the auth state matches
+            if (currentUser.uid !== auth.currentUser.uid) {
+                alert('Security error detected. Please login again.');
+                logout();
                 return;
             }
             
@@ -903,7 +930,7 @@
             }
             
             const expense = {
-                userId: currentUser.uid,
+                userId: auth.currentUser.uid, // Use auth.currentUser to prevent manipulation
                 date: document.getElementById('date').value,
                 amount: parseFloat(document.getElementById('amount').value),
                 category: categoryValue,
@@ -929,7 +956,12 @@
                 document.getElementById('customCategory').required = false;
             } catch (error) {
                 console.error('Error adding expense:', error);
-                alert('Failed to add expense. Please try again.');
+                if (error.code === 'permission-denied') {
+                    alert('Permission denied. Please make sure you are logged in properly.');
+                    logout();
+                } else {
+                    alert('Failed to add expense: ' + error.message);
+                }
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Add Expense';
