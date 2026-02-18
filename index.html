@@ -1490,13 +1490,21 @@
 
             db.collection('expenses')
                 .where('userId', '==', currentUser.uid)
-                .where('profileId', '==', currentProfile.id)
                 .onSnapshot(snapshot => {
                     expenses = [];
                     snapshot.forEach(doc => {
                         const data = doc.data();
+                        // Include expenses that match current profile OR have no profileId (old data)
                         if (data.userId === currentUser.uid) {
-                            expenses.push({ id: doc.id, ...data });
+                            if (!data.profileId || data.profileId === currentProfile.id) {
+                                expenses.push({ 
+                                    id: doc.id, 
+                                    ...data,
+                                    // Add default values for old data
+                                    personName: data.personName || 'Unknown',
+                                    isShared: data.isShared || false
+                                });
+                            }
                         }
                     });
 
@@ -1507,7 +1515,11 @@
                     updateSummary();
                 }, error => {
                     console.error('Error loading expenses:', error);
-                    expenseList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><p>Error loading expenses</p></div>';
+                    if (error.code === 'permission-denied') {
+                        expenseList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔒</div><p>Permission denied. Please update Firestore rules.</p></div>';
+                    } else {
+                        expenseList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><p>Error loading expenses</p></div>';
+                    }
                 });
         }
 
