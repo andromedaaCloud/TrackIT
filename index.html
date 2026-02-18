@@ -678,6 +678,13 @@
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
+        
+        // Configure action code settings for password reset
+        auth.useDeviceLanguage();
+        const actionCodeSettings = {
+            url: 'https://jaffer97.github.io/trackit/reset-password.html',
+            handleCodeInApp: true
+        };
 
         // Global variables
         let expenses = [];
