@@ -908,8 +908,8 @@
                     <button class="logout-btn" onclick="logout()">Logout</button>
                 </div>
 
-                <!-- Profile Switcher -->
-                <div class="profile-switcher">
+                <!-- Profile Switcher (Hidden - keeping for data compatibility) -->
+                <div class="profile-switcher" style="display: none;">
                     <div class="profile-icon" id="profileIcon">P</div>
                     <div class="profile-select-wrapper">
                         <label>Current Profile</label>
@@ -938,8 +938,8 @@
                     
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="personName">Who Spent?</label>
-                            <input type="text" id="personName" required placeholder="e.g., Self, Spouse, John">
+                            <label for="personName">Split with (comma-separated, leave empty if just you)</label>
+                            <input type="text" id="personName" placeholder="e.g., John, Mary (or leave empty)">
                         </div>
                         <div class="form-group">
                             <label for="category">Category</label>
@@ -1000,6 +1000,11 @@
                         <div class="stat-icon">👥</div>
                         <div class="stat-label">Unique People</div>
                         <div class="stat-value"><span id="uniquePeople">0</span></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">💚</div>
+                        <div class="stat-label">Others Owe Me</div>
+                        <div class="stat-value" style="color: #10b981;">₹<span id="totalOwed">0</span></div>
                     </div>
                 </div>
 
@@ -1082,8 +1087,8 @@
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="editPersonName">Who Spent?</label>
-                        <input type="text" id="editPersonName" required>
+                        <label for="editPersonName">Split with (comma-separated, leave empty if just you)</label>
+                        <input type="text" id="editPersonName">
                     </div>
                     <div class="form-group">
                         <label for="editCategory">Category</label>
@@ -1733,11 +1738,14 @@
 
         function renderAllExpenses(filtered) {
             const list = document.getElementById('expenseList');
-            list.innerHTML = filtered.map(e => `
+            list.innerHTML = filtered.map(e => {
+                const owed = calculateOwed(e);
+                const personDisplay = e.personName && e.personName.trim() ? e.personName : 'Just you';
+                return `
                 <div class="expense-item">
                     <div class="expense-details">
                         <div class="expense-header">
-                            <span class="expense-person">👤 ${e.personName}</span>
+                            <span class="expense-person">👤 ${personDisplay}</span>
                             <span class="expense-category">${e.category}</span>
                             ${e.isShared ? '<span class="expense-split-badge">🔀 Shared</span>' : ''}
                         </div>
@@ -1746,13 +1754,16 @@
                             weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
                         })}</div>
                     </div>
-                    <div style="display: flex; align-items: center;">
-                        <div class="expense-amount">₹${e.amount.toFixed(2)}</div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="text-align: right;">
+                            <div class="expense-amount">₹${e.amount.toFixed(2)}</div>
+                            ${owed > 0 ? `<div style="font-size: 0.85em; color: #10b981; font-weight: 600;">They owe: ₹${owed.toFixed(2)}</div>` : ''}
+                        </div>
                         <button class="edit-btn" onclick="openEditModal('${e.id}')">Edit</button>
                         <button class="delete-btn" onclick="deleteExpense('${e.id}')">Delete</button>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
         }
 
         function renderByPerson(filtered) {
@@ -1844,6 +1855,25 @@
             }).join('');
         }
 
+        // Calculate what others owe you
+        function calculateOwed(expense) {
+            // If not shared or no person name, nobody owes you
+            if (!expense.isShared || !expense.personName || expense.personName === 'Unknown' || expense.personName.trim() === '') {
+                return 0;
+            }
+            
+            // Split by comma and count people
+            const people = expense.personName.split(',').map(p => p.trim()).filter(Boolean);
+            if (people.length === 0) return 0;
+            
+            // Total people = them + you
+            const totalPeople = people.length + 1;
+            const perPerson = expense.amount / totalPeople;
+            
+            // Return what others owe (their share)
+            return perPerson * people.length;
+        }
+
         function updateSummary() {
             const filtered = getFilteredExpenses();
             const total = filtered.reduce((sum, e) => sum + e.amount, 0);
@@ -1857,11 +1887,15 @@
             }
 
             const uniquePeople = new Set(filtered.map(e => e.personName)).size;
+            
+            // Calculate total owed
+            const totalOwed = filtered.reduce((sum, e) => sum + calculateOwed(e), 0);
 
             document.getElementById('totalAmount').textContent = total.toFixed(2);
             document.getElementById('totalCount').textContent = count;
             document.getElementById('avgAmount').textContent = avgPerDay.toFixed(2);
             document.getElementById('uniquePeople').textContent = uniquePeople;
+            document.getElementById('totalOwed').textContent = totalOwed.toFixed(2);
         }
 
         async function deleteExpense(id) {
