@@ -903,7 +903,7 @@
                     <div class="user-avatar" id="userAvatar">U</div>
                     <div class="user-details">
                         <div class="user-name" id="userName">User</div>
-                        <div class="user-email" id="userEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="136660766153767e727a7f3d707c7e">[email&#160;protected]</a></div>
+                        <div class="user-email" id="userEmail">user@email.com</div>
                     </div>
                     <button class="logout-btn" onclick="logout()">Logout</button>
                 </div>
@@ -971,7 +971,7 @@
 
                     <div class="checkbox-group">
                         <input type="checkbox" id="isShared">
-                        <label for="isShared">Split this expense (if unchecked, they owe full amount)</label>
+                        <label for="isShared">This is a shared/split expense</label>
                     </div>
 
                     <button type="submit" id="addExpenseBtn" class="btn">Add Expense</button>
@@ -1114,7 +1114,7 @@
 
                 <div class="checkbox-group">
                     <input type="checkbox" id="editIsShared">
-                    <label for="editIsShared">Split this expense (if unchecked, they owe full amount)</label>
+                    <label for="editIsShared">This is a shared/split expense</label>
                 </div>
 
                 <button type="submit" id="saveEditBtn" class="btn">Save Changes</button>
@@ -1122,7 +1122,7 @@
         </div>
     </div>
 
-    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+    <script>
         // Initialize Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyDz7h-ch2T86bXqs6rNDhQOxw_7p7uxAAY",
@@ -1155,7 +1155,7 @@
                 auth.currentUser.getIdToken(true).then(() => {
                     currentUser = user;
                     showMainApp(user);
-                    loadExpenses(); // Load expenses directly, no profiles needed
+                    loadProfiles();
                 }).catch(error => {
                     console.error('Auth verification failed:', error);
                     auth.signOut();
@@ -1569,8 +1569,8 @@
         document.getElementById('expenseForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            if (!currentUser) {
-                alert('Please login first');
+            if (!currentUser || !currentProfile) {
+                alert('Please select a profile first');
                 return;
             }
 
@@ -1586,6 +1586,7 @@
 
             const expense = {
                 userId: currentUser.uid,
+                profileId: currentProfile.id,
                 date: document.getElementById('date').value,
                 amount: parseFloat(document.getElementById('amount').value),
                 personName: document.getElementById('personName').value.trim(),
@@ -1619,7 +1620,7 @@
         });
 
         function loadExpenses() {
-            if (!currentUser) return;
+            if (!currentUser || !currentProfile) return;
             
             const expenseList = document.getElementById('expenseList');
             expenseList.innerHTML = '<div class="loading">Loading expenses...</div>';
@@ -1630,15 +1631,17 @@
                     expenses = [];
                     snapshot.forEach(doc => {
                         const data = doc.data();
-                        // Load all user expenses, regardless of profileId
+                        // Include expenses that match current profile OR have no profileId (old data)
                         if (data.userId === currentUser.uid) {
-                            expenses.push({ 
-                                id: doc.id, 
-                                ...data,
-                                // Add default values for old data
-                                personName: data.personName || '',
-                                isShared: data.isShared || false
-                            });
+                            if (!data.profileId || data.profileId === currentProfile.id) {
+                                expenses.push({ 
+                                    id: doc.id, 
+                                    ...data,
+                                    // Add default values for old data
+                                    personName: data.personName || 'Unknown',
+                                    isShared: data.isShared || false
+                                });
+                            }
                         }
                     });
 
@@ -1854,14 +1857,8 @@
 
         // Calculate what others owe you
         function calculateOwed(expense) {
-            // If no person name, nobody owes you
-            if (!expense.personName || expense.personName === 'Unknown' || expense.personName.trim() === '') {
-                return 0;
-            }
-            
-            // Safety check: If it's "Self", "Me", "You" → nobody owes (old data compatibility)
-            const personLower = expense.personName.toLowerCase().trim();
-            if (personLower === 'self' || personLower === 'me' || personLower === 'you' || personLower === 'myself') {
+            // If not shared or no person name, nobody owes you
+            if (!expense.isShared || !expense.personName || expense.personName === 'Unknown' || expense.personName.trim() === '') {
                 return 0;
             }
             
@@ -1869,12 +1866,6 @@
             const people = expense.personName.split(',').map(p => p.trim()).filter(Boolean);
             if (people.length === 0) return 0;
             
-            // If NOT shared (checkbox unchecked) → They owe FULL amount
-            if (!expense.isShared) {
-                return expense.amount;
-            }
-            
-            // If SHARED (checkbox checked) → Split the cost
             // Total people = them + you
             const totalPeople = people.length + 1;
             const perPerson = expense.amount / totalPeople;
@@ -1946,7 +1937,7 @@
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `trackit_expenses_${new Date().toISOString().split('T')[0]}.csv`;
+            a.download = `trackit_${currentProfile.name}_${new Date().toISOString().split('T')[0]}.csv`;
             a.click();
             window.URL.revokeObjectURL(url);
             
@@ -1961,4 +1952,11 @@
         // Register Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('PWA: Service Worker registered'))
+                    .catch(err => console.log('PWA: Service Worker failed:', err));
+            });
+        }
+    </script>
+</body>
+</html>
