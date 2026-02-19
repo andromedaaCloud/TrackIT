@@ -1155,7 +1155,7 @@
                 auth.currentUser.getIdToken(true).then(() => {
                     currentUser = user;
                     showMainApp(user);
-                    loadProfiles();
+                    loadExpenses(); // Load expenses directly, no profiles needed
                 }).catch(error => {
                     console.error('Auth verification failed:', error);
                     auth.signOut();
@@ -1569,8 +1569,8 @@
         document.getElementById('expenseForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            if (!currentUser || !currentProfile) {
-                alert('Please select a profile first');
+            if (!currentUser) {
+                alert('Please login first');
                 return;
             }
 
@@ -1586,7 +1586,6 @@
 
             const expense = {
                 userId: currentUser.uid,
-                profileId: currentProfile.id,
                 date: document.getElementById('date').value,
                 amount: parseFloat(document.getElementById('amount').value),
                 personName: document.getElementById('personName').value.trim(),
@@ -1620,7 +1619,7 @@
         });
 
         function loadExpenses() {
-            if (!currentUser || !currentProfile) return;
+            if (!currentUser) return;
             
             const expenseList = document.getElementById('expenseList');
             expenseList.innerHTML = '<div class="loading">Loading expenses...</div>';
@@ -1631,17 +1630,15 @@
                     expenses = [];
                     snapshot.forEach(doc => {
                         const data = doc.data();
-                        // Include expenses that match current profile OR have no profileId (old data)
+                        // Load all user expenses, regardless of profileId
                         if (data.userId === currentUser.uid) {
-                            if (!data.profileId || data.profileId === currentProfile.id) {
-                                expenses.push({ 
-                                    id: doc.id, 
-                                    ...data,
-                                    // Add default values for old data
-                                    personName: data.personName || 'Unknown',
-                                    isShared: data.isShared || false
-                                });
-                            }
+                            expenses.push({ 
+                                id: doc.id, 
+                                ...data,
+                                // Add default values for old data
+                                personName: data.personName || '',
+                                isShared: data.isShared || false
+                            });
                         }
                     });
 
@@ -1949,7 +1946,7 @@
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `trackit_${currentProfile.name}_${new Date().toISOString().split('T')[0]}.csv`;
+            a.download = `trackit_expenses_${new Date().toISOString().split('T')[0]}.csv`;
             a.click();
             window.URL.revokeObjectURL(url);
             
