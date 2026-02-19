@@ -1872,8 +1872,11 @@
             const people = expense.personName.split(',').map(p => p.trim()).filter(Boolean);
             if (people.length === 0) return 0;
             
-            // If NOT shared (checkbox unchecked) → They owe FULL amount
-            if (!expense.isShared) {
+            // Check if shared - handle both false and undefined/null
+            const isExpenseShared = expense.isShared === true;
+            
+            // If NOT shared (checkbox unchecked or undefined) → They owe FULL amount
+            if (!isExpenseShared) {
                 return expense.amount;
             }
             
