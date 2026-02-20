@@ -16,8 +16,14 @@
     
     <!-- PWA Config -->
     <meta name="theme-color" content="#10b981">
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="manifest" href="/TrackIT/manifest.json">
+
+    <!-- Safari iOS PWA Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="TrackIT">
+    <link rel="apple-touch-icon" href="/TrackIT/icon-192.png">
+    <link rel="apple-touch-startup-image" href="/TrackIT/icon-512.png">
     
     <!-- Plus Jakarta Sans Font -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -421,26 +427,62 @@
             cursor: pointer;
         }
 
-        .tabs {
+        .accordion {
             display: flex;
-            gap: 8px;
+            flex-direction: column;
+            gap: 10px;
             margin-bottom: 16px;
         }
 
-        .tab {
-            flex: 1;
-            padding: 10px;
-            background: #f3f4f6;
-            border: none;
-            border-radius: 10px;
-            font-weight: 600;
-            cursor: pointer;
-            color: #6b7280;
+        .accordion-item {
+            border: 2px solid #d1fae5;
+            border-radius: 12px;
+            overflow: hidden;
         }
 
-        .tab.active {
+        .accordion-header {
+            width: 100%;
+            padding: 14px 18px;
+            background: #f3f4f6;
+            border: none;
+            border-radius: 0;
+            font-weight: 700;
+            cursor: pointer;
+            color: #065f46;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 1em;
+            transition: background 0.2s;
+        }
+
+        .accordion-header:hover {
+            background: #d1fae5;
+        }
+
+        .accordion-header.active {
             background: #10b981;
             color: white;
+        }
+
+        .accordion-arrow {
+            transition: transform 0.3s;
+            font-size: 0.85em;
+        }
+
+        .accordion-header.active .accordion-arrow {
+            transform: rotate(180deg);
+        }
+
+        .accordion-body {
+            display: none;
+            padding: 16px;
+            background: white;
+        }
+
+        .accordion-body.open {
+            display: block;
         }
 
         .checkbox-group {
@@ -621,13 +663,31 @@
             </div>
 
             <div class="card">
-                <div class="tabs">
-                    <button class="tab active" onclick="switchView('all')">All</button>
-                    <button class="tab" onclick="switchView('person')">By Person</button>
-                    <button class="tab" onclick="switchView('month')">By Month</button>
-                </div>
-                <div id="expenseList">
-                    <div class="empty">Loading...</div>
+                <div class="accordion">
+                    <div class="accordion-item">
+                        <button class="accordion-header" onclick="toggleAccordion('all', this)">
+                            📋 All Expenses <span class="accordion-arrow">▼</span>
+                        </button>
+                        <div class="accordion-body" id="accordion-all">
+                            <div id="expenseList-all"><div class="empty">Loading...</div></div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <button class="accordion-header" onclick="toggleAccordion('person', this)">
+                            👤 By Person <span class="accordion-arrow">▼</span>
+                        </button>
+                        <div class="accordion-body" id="accordion-person">
+                            <div id="expenseList-person"></div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <button class="accordion-header" onclick="toggleAccordion('month', this)">
+                            📅 By Month <span class="accordion-arrow">▼</span>
+                        </button>
+                        <div class="accordion-body" id="accordion-month">
+                            <div id="expenseList-month"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -699,7 +759,6 @@
         const db = firebase.firestore();
         let expenses = [];
         let currentUser = null;
-        let currentView = 'all';
 
         document.getElementById('date').valueAsDate = new Date();
 
@@ -801,6 +860,7 @@
         }
 
         // Expenses
+        let accordionInitialized = false;
         function loadExpenses() {
             db.collection('expenses')
                 .where('userId', '==', currentUser.uid)
@@ -810,6 +870,15 @@
                     expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
                     updateStats();
                     renderExpenses();
+                    // Auto-open "All" accordion on first load
+                    if (!accordionInitialized) {
+                        accordionInitialized = true;
+                        const body = document.getElementById('accordion-all');
+                        const btn = document.querySelector('.accordion-header');
+                        body.classList.add('open');
+                        btn.classList.add('active');
+                        renderSection('all');
+                    }
                 });
         }
 
@@ -871,22 +940,38 @@
             document.getElementById('totalOwed').textContent = owed.toFixed(2);
         }
 
-        function switchView(view) {
-            currentView = view;
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            event.target.classList.add('active');
-            renderExpenses();
+        function toggleAccordion(view, btn) {
+            const body = document.getElementById('accordion-' + view);
+            const isOpen = body.classList.contains('open');
+
+            // Close all
+            document.querySelectorAll('.accordion-body').forEach(b => b.classList.remove('open'));
+            document.querySelectorAll('.accordion-header').forEach(h => h.classList.remove('active'));
+
+            // Open clicked one if it was closed
+            if (!isOpen) {
+                body.classList.add('open');
+                btn.classList.add('active');
+                renderSection(view);
+            }
         }
 
         function renderExpenses() {
-            const list = document.getElementById('expenseList');
+            // Re-render whichever accordion is currently open
+            const openBody = document.querySelector('.accordion-body.open');
+            if (!openBody) return;
+            const view = openBody.id.replace('accordion-', '');
+            renderSection(view);
+        }
+
+        function renderSection(view) {
+            const list = document.getElementById('expenseList-' + view);
             if (expenses.length === 0) {
                 list.innerHTML = '<div class="empty">No expenses yet</div>';
                 return;
             }
-
-            if (currentView === 'person') renderByPerson(list);
-            else if (currentView === 'month') renderByMonth(list);
+            if (view === 'person') renderByPerson(list);
+            else if (view === 'month') renderByMonth(list);
             else renderAll(list);
         }
 
