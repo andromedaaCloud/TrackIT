@@ -663,32 +663,14 @@
             </div>
 
             <div class="card">
-                <div class="accordion">
-                    <div class="accordion-item">
-                        <button class="accordion-header" onclick="toggleAccordion('all', this)">
-                            📋 All Expenses <span class="accordion-arrow">▼</span>
-                        </button>
-                        <div class="accordion-body" id="accordion-all">
-                            <div id="expenseList-all"><div class="empty">Loading...</div></div>
-                        </div>
-                    </div>
-                    <div class="accordion-item">
-                        <button class="accordion-header" onclick="toggleAccordion('person', this)">
-                            👤 By Person <span class="accordion-arrow">▼</span>
-                        </button>
-                        <div class="accordion-body" id="accordion-person">
-                            <div id="expenseList-person"></div>
-                        </div>
-                    </div>
-                    <div class="accordion-item">
-                        <button class="accordion-header" onclick="toggleAccordion('month', this)">
-                            📅 By Month <span class="accordion-arrow">▼</span>
-                        </button>
-                        <div class="accordion-body" id="accordion-month">
-                            <div id="expenseList-month"></div>
-                        </div>
-                    </div>
+                <div style="margin-bottom: 16px;">
+                    <select id="viewSelect" onchange="switchView(this.value)" style="width:100%; padding:12px 14px; border:2px solid #d1fae5; border-radius:10px; font-size:1em; font-family:'Plus Jakarta Sans',sans-serif; font-weight:600; color:#065f46; background:white; cursor:pointer;">
+                        <option value="all">📋 All Expenses</option>
+                        <option value="person">👤 By Person</option>
+                        <option value="month">📅 By Month</option>
+                    </select>
                 </div>
+                <div id="expenseList"><div class="empty">Loading...</div></div>
             </div>
         </div>
     </div>
@@ -759,6 +741,7 @@
         const db = firebase.firestore();
         let expenses = [];
         let currentUser = null;
+        let currentView = 'all';
 
         document.getElementById('date').valueAsDate = new Date();
 
@@ -860,7 +843,6 @@
         }
 
         // Expenses
-        let accordionInitialized = false;
         function loadExpenses() {
             db.collection('expenses')
                 .where('userId', '==', currentUser.uid)
@@ -870,15 +852,6 @@
                     expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
                     updateStats();
                     renderExpenses();
-                    // Auto-open "All" accordion on first load
-                    if (!accordionInitialized) {
-                        accordionInitialized = true;
-                        const body = document.getElementById('accordion-all');
-                        const btn = document.querySelector('.accordion-header');
-                        body.classList.add('open');
-                        btn.classList.add('active');
-                        renderSection('all');
-                    }
                 });
         }
 
@@ -940,39 +913,24 @@
             document.getElementById('totalOwed').textContent = owed.toFixed(2);
         }
 
-        function toggleAccordion(view, btn) {
-            const body = document.getElementById('accordion-' + view);
-            const isOpen = body.classList.contains('open');
-
-            // Close all
-            document.querySelectorAll('.accordion-body').forEach(b => b.classList.remove('open'));
-            document.querySelectorAll('.accordion-header').forEach(h => h.classList.remove('active'));
-
-            // Open clicked one if it was closed
-            if (!isOpen) {
-                body.classList.add('open');
-                btn.classList.add('active');
-                renderSection(view);
-            }
+        function switchView(view) {
+            currentView = view;
+            renderExpenses();
         }
 
         function renderExpenses() {
-            // Re-render whichever accordion is currently open
-            const openBody = document.querySelector('.accordion-body.open');
-            if (!openBody) return;
-            const view = openBody.id.replace('accordion-', '');
-            renderSection(view);
-        }
-
-        function renderSection(view) {
-            const list = document.getElementById('expenseList-' + view);
+            const list = document.getElementById('expenseList');
             if (expenses.length === 0) {
                 list.innerHTML = '<div class="empty">No expenses yet</div>';
                 return;
             }
-            if (view === 'person') renderByPerson(list);
-            else if (view === 'month') renderByMonth(list);
+            if (currentView === 'person') renderByPerson(list);
+            else if (currentView === 'month') renderByMonth(list);
             else renderAll(list);
+        }
+
+        function renderSection(view) {
+            renderExpenses();
         }
 
         function renderAll(list) {
