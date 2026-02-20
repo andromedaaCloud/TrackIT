@@ -235,6 +235,7 @@
             cursor: pointer;
             margin-left: 8px;
             font-size: 0.85em;
+            font-family: 'Plus Jakarta Sans', sans-serif;
         }
 
         .btn-edit {
@@ -242,9 +243,73 @@
             color: #1e40af;
         }
 
+        .btn-edit:hover {
+            background: #3b82f6;
+            color: white;
+        }
+
         .btn-delete {
             background: #fee2e2;
             color: #dc2626;
+        }
+
+        .btn-delete:hover {
+            background: #dc2626;
+            color: white;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 28px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 1.4em;
+            font-weight: 700;
+            color: #065f46;
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 1.8em;
+            cursor: pointer;
+            color: #6b7280;
+            padding: 0;
+            width: 32px;
+            height: 32px;
         }
 
         /* Auth */
@@ -568,6 +633,57 @@
         </div>
     </div>
 
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Edit Expense</h2>
+                <button class="close-modal" onclick="closeEditModal()">×</button>
+            </div>
+            <form id="editForm">
+                <input type="hidden" id="editId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date" id="editDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Amount (₹)</label>
+                        <input type="number" id="editAmount" step="0.01" min="0" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Split with</label>
+                        <input type="text" id="editSplitWith" placeholder="John, Mary">
+                    </div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="editCategory" required>
+                            <option value="">Select</option>
+                            <option value="Food">🍔 Food</option>
+                            <option value="Transport">🚗 Transport</option>
+                            <option value="Shopping">🛍️ Shopping</option>
+                            <option value="Entertainment">🎬 Entertainment</option>
+                            <option value="Bills">💡 Bills</option>
+                            <option value="Health">💊 Health</option>
+                            <option value="Other">📦 Other</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <input type="text" id="editDescription">
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="editIsShared">
+                    <label for="editIsShared" style="margin: 0;">Split cost</label>
+                </div>
+                <button type="submit" class="btn">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
     <script>
         // Firebase
         firebase.initializeApp({
@@ -793,6 +909,7 @@
                             <div class="expense-amount">₹${e.amount.toFixed(2)}</div>
                             ${owed > 0 ? `<div class="expense-owed">Owed: ₹${owed.toFixed(2)}</div>` : ''}
                             <div style="margin-top: 8px;">
+                                <button class="btn-edit" onclick="openEditModal('${e.id}')">Edit</button>
                                 <button class="btn-delete" onclick="deleteExpense('${e.id}')">Delete</button>
                             </div>
                         </div>
@@ -828,7 +945,10 @@
                             </div>
                             <div style="text-align: right;">
                                 <div class="expense-amount">₹${e.amount.toFixed(2)}</div>
-                                <button class="btn-delete" onclick="deleteExpense('${e.id}')">Delete</button>
+                                <div style="margin-top: 8px;">
+                                    <button class="btn-edit" onclick="openEditModal('${e.id}')">Edit</button>
+                                    <button class="btn-delete" onclick="deleteExpense('${e.id}')">Delete</button>
+                                </div>
                             </div>
                         </div>
                     `).join('')}
@@ -870,7 +990,10 @@
                                     <div style="text-align: right;">
                                         <div class="expense-amount">₹${e.amount.toFixed(2)}</div>
                                         ${owed > 0 ? `<div class="expense-owed">Owed: ₹${owed.toFixed(2)}</div>` : ''}
-                                        <button class="btn-delete" onclick="deleteExpense('${e.id}')">Delete</button>
+                                        <div style="margin-top: 8px;">
+                                            <button class="btn-edit" onclick="openEditModal('${e.id}')">Edit</button>
+                                            <button class="btn-delete" onclick="deleteExpense('${e.id}')">Delete</button>
+                                        </div>
                                     </div>
                                 </div>
                             `;
@@ -879,6 +1002,45 @@
                 `;
             }).join('');
         }
+
+        function openEditModal(id) {
+            const expense = expenses.find(e => e.id === id);
+            if (!expense) return;
+            
+            document.getElementById('editId').value = id;
+            document.getElementById('editDate').value = expense.date;
+            document.getElementById('editAmount').value = expense.amount;
+            document.getElementById('editSplitWith').value = expense.splitWith || '';
+            document.getElementById('editCategory').value = expense.category;
+            document.getElementById('editDescription').value = expense.description || '';
+            document.getElementById('editIsShared').checked = expense.isShared || false;
+            
+            document.getElementById('editModal').classList.add('active');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.remove('active');
+        }
+
+        document.getElementById('editForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('editId').value;
+            
+            try {
+                await db.collection('expenses').doc(id).update({
+                    date: document.getElementById('editDate').value,
+                    amount: parseFloat(document.getElementById('editAmount').value),
+                    splitWith: document.getElementById('editSplitWith').value.trim(),
+                    category: document.getElementById('editCategory').value,
+                    description: document.getElementById('editDescription').value.trim(),
+                    isShared: document.getElementById('editIsShared').checked,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                closeEditModal();
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        });
 
         function downloadCSV() {
             if (expenses.length === 0) return alert('No expenses');
