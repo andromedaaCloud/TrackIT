@@ -748,6 +748,10 @@
             </div>
 
             <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <div style="font-weight:700; color:#065f46; font-size:0.95em;">📊 Summary</div>
+                    <div id="statsLabel" style="font-size:0.8em; font-weight:600; color:#10b981; background:#d1fae5; padding:4px 10px; border-radius:10px;">All Expenses</div>
+                </div>
                 <div class="stats">
                     <div class="stat-card">
                         <div class="stat-label">Total Spent</div>
@@ -756,10 +760,6 @@
                     <div class="stat-card">
                         <div class="stat-label">Transactions</div>
                         <div class="stat-value"><span id="totalCount">0</span></div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Avg per Day</div>
-                        <div class="stat-value">₹<span id="avgPerDay">0</span></div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-label">Others Owe Me</div>
@@ -1065,24 +1065,27 @@
         }
 
         function updateStats() {
-            const total = expenses.reduce((s, e) => s + e.amount, 0);
-            const count = expenses.length;
-            const owed = expenses.reduce((s, e) => s + calculateOwed(e), 0);
-            
-            let avg = 0;
-            if (count > 0) {
-                const days = new Set(expenses.map(e => e.date)).size;
-                avg = total / days;
-            }
-            
+            // Always exclude settled expenses
+            let filtered = expenses.filter(e => !e.settled);
+
+            // Filter further based on current view label
+            const labelMap = { all: '📋 All Expenses', person: '👤 By Person', month: '📅 By Month' };
+            document.getElementById('statsLabel').textContent = labelMap[currentView] || 'All Expenses';
+
+            // For person/month views, stats still reflect all active expenses
+            // but label updates to show context
+            const total = filtered.reduce((s, e) => s + e.amount, 0);
+            const count = filtered.length;
+            const owed = filtered.reduce((s, e) => s + calculateOwed(e), 0);
+
             document.getElementById('totalSpent').textContent = total.toFixed(2);
             document.getElementById('totalCount').textContent = count;
-            document.getElementById('avgPerDay').textContent = avg.toFixed(2);
             document.getElementById('totalOwed').textContent = owed.toFixed(2);
         }
 
         function switchView(view) {
             currentView = view;
+            updateStats();
             renderExpenses();
         }
 
