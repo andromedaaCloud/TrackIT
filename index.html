@@ -485,6 +485,113 @@
             display: block;
         }
 
+        .btn-settle {
+            padding: 8px 14px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-left: 8px;
+            font-size: 0.85em;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: #d1fae5;
+            color: #065f46;
+            transition: background 0.2s;
+        }
+
+        .btn-settle:hover {
+            background: #10b981;
+            color: white;
+        }
+
+        .settled-section {
+            margin-top: 10px;
+        }
+
+        .settled-toggle {
+            width: 100%;
+            padding: 12px 16px;
+            background: #f3f4f6;
+            border: 2px dashed #d1d5db;
+            border-radius: 10px;
+            font-weight: 600;
+            color: #6b7280;
+            cursor: pointer;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 0.95em;
+            text-align: left;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .settled-toggle:hover { background: #e5e7eb; }
+
+        .settled-list { display: none; margin-top: 10px; }
+        .settled-list.open { display: block; }
+
+        .expense-item.settled {
+            opacity: 0.55;
+            background: #f9fafb;
+        }
+
+        .expense-item.settled .expense-amount,
+        .expense-item.settled div[style*="font-weight: 600"] {
+            text-decoration: line-through;
+        }
+
+        .settled-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .group-accordion {
+            border: 2px solid #d1fae5;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .group-accordion-header {
+            width: 100%;
+            padding: 14px 18px;
+            background: #ecfdf5;
+            border: none;
+            font-weight: 700;
+            cursor: pointer;
+            color: #065f46;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 1em;
+            transition: background 0.2s;
+        }
+
+        .group-accordion-header:hover { background: #d1fae5; }
+        .group-accordion-header.open { background: #10b981; color: white; }
+        .group-accordion-header.open .g-arrow { transform: rotate(180deg); }
+
+        .g-arrow { transition: transform 0.3s; font-size: 0.85em; }
+
+        .group-accordion-body { display: none; padding: 12px; background: white; }
+        .group-accordion-body.open { display: block; }
+
+        .group-meta {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .group-meta .meta-spent { color: #059669; }
+        .group-meta .meta-owed { color: #f59e0b; }
+
         .checkbox-group {
             display: flex;
             align-items: center;
@@ -663,32 +770,23 @@
             </div>
 
             <div class="card">
-                <div class="accordion">
-                    <div class="accordion-item">
-                        <button class="accordion-header" onclick="toggleAccordion('all', this)">
-                            📋 All Expenses <span class="accordion-arrow">▼</span>
-                        </button>
-                        <div class="accordion-body" id="accordion-all">
-                            <div id="expenseList-all"><div class="empty">Loading...</div></div>
-                        </div>
-                    </div>
-                    <div class="accordion-item">
-                        <button class="accordion-header" onclick="toggleAccordion('person', this)">
-                            👤 By Person <span class="accordion-arrow">▼</span>
-                        </button>
-                        <div class="accordion-body" id="accordion-person">
-                            <div id="expenseList-person"></div>
-                        </div>
-                    </div>
-                    <div class="accordion-item">
-                        <button class="accordion-header" onclick="toggleAccordion('month', this)">
-                            📅 By Month <span class="accordion-arrow">▼</span>
-                        </button>
-                        <div class="accordion-body" id="accordion-month">
-                            <div id="expenseList-month"></div>
-                        </div>
-                    </div>
+                <div style="margin-bottom: 16px;">
+                    <select id="viewSelect" onchange="switchView(this.value)" style="width:100%; padding:12px 14px; border:2px solid #d1fae5; border-radius:10px; font-size:1em; font-family:'Plus Jakarta Sans',sans-serif; font-weight:600; color:#065f46; background:white; cursor:pointer;">
+                        <option value="all">📋 All Expenses</option>
+                        <option value="person">👤 By Person</option>
+                        <option value="month">📅 By Month</option>
+                    </select>
                 </div>
+                <div id="expenseList"><div class="empty">Loading...</div></div>
+            </div>
+
+            <!-- Settled Expenses -->
+            <div class="card settled-section">
+                <button class="settled-toggle" onclick="toggleSettled(this)">
+                    <span>✅ Settled Expenses <span id="settledCount" style="background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:10px;font-size:0.85em;margin-left:6px;">0</span></span>
+                    <span class="g-arrow">▼</span>
+                </button>
+                <div class="settled-list" id="settledList"></div>
             </div>
         </div>
     </div>
@@ -759,6 +857,7 @@
         const db = firebase.firestore();
         let expenses = [];
         let currentUser = null;
+        let currentView = 'all';
 
         document.getElementById('date').valueAsDate = new Date();
 
@@ -860,7 +959,6 @@
         }
 
         // Expenses
-        let accordionInitialized = false;
         function loadExpenses() {
             db.collection('expenses')
                 .where('userId', '==', currentUser.uid)
@@ -870,15 +968,6 @@
                     expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
                     updateStats();
                     renderExpenses();
-                    // Auto-open "All" accordion on first load
-                    if (!accordionInitialized) {
-                        accordionInitialized = true;
-                        const body = document.getElementById('accordion-all');
-                        const btn = document.querySelector('.accordion-header');
-                        body.classList.add('open');
-                        btn.classList.add('active');
-                        renderSection('all');
-                    }
                 });
         }
 
@@ -901,6 +990,58 @@
                 alert('Error: ' + err.message);
             }
         });
+
+        async function settleExpense(id) {
+            if (confirm('Mark this expense as settled?')) {
+                await db.collection('expenses').doc(id).update({ settled: true });
+            }
+        }
+
+        async function unsettleExpense(id) {
+            await db.collection('expenses').doc(id).update({ settled: false });
+        }
+
+        function toggleGroup(btn) {
+            const body = btn.nextElementSibling;
+            const isOpen = body.classList.contains('open');
+            body.classList.toggle('open', !isOpen);
+            btn.classList.toggle('open', !isOpen);
+        }
+
+        function toggleSettled(btn) {
+            const list = document.getElementById('settledList');
+            const arrow = btn.querySelector('.g-arrow');
+            const isOpen = list.classList.contains('open');
+            list.classList.toggle('open', !isOpen);
+            arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
+        }
+
+        function renderSettled() {
+            const settled = expenses.filter(e => e.settled);
+            document.getElementById('settledCount').textContent = settled.length;
+            const list = document.getElementById('settledList');
+            if (settled.length === 0) { list.innerHTML = '<div class="empty" style="padding:20px;">No settled expenses yet</div>'; return; }
+            list.innerHTML = settled.map(e => `
+                <div class="expense-item settled">
+                    <div class="expense-details">
+                        <div class="expense-header">
+                            <span class="badge badge-person">👤 ${e.splitWith || 'Just you'}</span>
+                            <span class="badge badge-category">${e.category}</span>
+                            <span class="settled-badge">✅ Settled</span>
+                        </div>
+                        <div style="font-weight:600;text-decoration:line-through;">${e.description || 'No description'}</div>
+                        <div style="font-size:0.85em;color:#9ca3af;">${new Date(e.date).toLocaleDateString()}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div class="expense-amount" style="text-decoration:line-through;">₹${e.amount.toFixed(2)}</div>
+                        <div style="margin-top:8px;">
+                            <button class="btn-edit" onclick="unsettleExpense('${e.id}')" style="background:#fef3c7;color:#92400e;">↩ Unsettle</button>
+                            <button class="btn-delete" onclick="deleteExpense('${e.id}')">Delete</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
 
         async function deleteExpense(id) {
             if (confirm('Delete?')) {
@@ -940,43 +1081,31 @@
             document.getElementById('totalOwed').textContent = owed.toFixed(2);
         }
 
-        function toggleAccordion(view, btn) {
-            const body = document.getElementById('accordion-' + view);
-            const isOpen = body.classList.contains('open');
-
-            // Close all
-            document.querySelectorAll('.accordion-body').forEach(b => b.classList.remove('open'));
-            document.querySelectorAll('.accordion-header').forEach(h => h.classList.remove('active'));
-
-            // Open clicked one if it was closed
-            if (!isOpen) {
-                body.classList.add('open');
-                btn.classList.add('active');
-                renderSection(view);
-            }
+        function switchView(view) {
+            currentView = view;
+            renderExpenses();
         }
 
         function renderExpenses() {
-            // Re-render whichever accordion is currently open
-            const openBody = document.querySelector('.accordion-body.open');
-            if (!openBody) return;
-            const view = openBody.id.replace('accordion-', '');
-            renderSection(view);
+            const list = document.getElementById('expenseList');
+            if (expenses.filter(e => !e.settled).length === 0) {
+                list.innerHTML = '<div class="empty">No active expenses</div>';
+            } else {
+                if (currentView === 'person') renderByPerson(list);
+                else if (currentView === 'month') renderByMonth(list);
+                else renderAll(list);
+            }
+            renderSettled();
         }
 
         function renderSection(view) {
-            const list = document.getElementById('expenseList-' + view);
-            if (expenses.length === 0) {
-                list.innerHTML = '<div class="empty">No expenses yet</div>';
-                return;
-            }
-            if (view === 'person') renderByPerson(list);
-            else if (view === 'month') renderByMonth(list);
-            else renderAll(list);
+            renderExpenses();
         }
 
         function renderAll(list) {
-            list.innerHTML = expenses.map(e => {
+            const active = expenses.filter(e => !e.settled);
+            if (active.length === 0) { list.innerHTML = '<div class="empty">No active expenses</div>'; return; }
+            list.innerHTML = active.map(e => {
                 const owed = calculateOwed(e);
                 const person = e.splitWith || 'Just you';
                 return `
@@ -994,6 +1123,7 @@
                             <div class="expense-amount">₹${e.amount.toFixed(2)}</div>
                             ${owed > 0 ? `<div class="expense-owed">Owed: ₹${owed.toFixed(2)}</div>` : ''}
                             <div style="margin-top: 8px;">
+                                <button class="btn-settle" onclick="settleExpense('${e.id}')">✓ Settle</button>
                                 <button class="btn-edit" onclick="openEditModal('${e.id}')">Edit</button>
                                 <button class="btn-delete" onclick="deleteExpense('${e.id}')">Delete</button>
                             </div>
@@ -1004,61 +1134,87 @@
         }
 
         function renderByPerson(list) {
+            const active = expenses.filter(e => !e.settled);
             const groups = {};
-            expenses.forEach(e => {
+            active.forEach(e => {
                 const person = e.splitWith || 'Just you';
-                if (!groups[person]) groups[person] = {list: [], total: 0};
+                if (!groups[person]) groups[person] = {list: [], total: 0, owed: 0};
                 groups[person].list.push(e);
                 groups[person].total += e.amount;
+                groups[person].owed += calculateOwed(e);
             });
 
-            list.innerHTML = Object.entries(groups).map(([person, data]) => `
-                <div style="margin-bottom: 24px;">
-                    <div style="background: #ecfdf5; padding: 14px; border-radius: 10px; margin-bottom: 10px;">
-                        <strong style="color: #065f46;">👤 ${person}</strong>
-                        <span style="float: right; font-size: 1.2em; font-weight: 800; color: #059669;">₹${data.total.toFixed(2)}</span>
-                    </div>
-                    ${data.list.map(e => `
-                        <div class="expense-item">
-                            <div class="expense-details">
-                                <div class="expense-header">
-                                    <span class="badge badge-category">${e.category}</span>
-                                    ${e.isShared ? '<span class="badge badge-shared">🔀 Split</span>' : ''}
-                                </div>
-                                <div style="font-weight: 600;">${e.description || 'No description'}</div>
-                                <div style="font-size: 0.85em; color: #6b7280;">${new Date(e.date).toLocaleDateString()}</div>
-                            </div>
-                            <div style="text-align: right;">
-                                <div class="expense-amount">₹${e.amount.toFixed(2)}</div>
-                                <div style="margin-top: 8px;">
-                                    <button class="btn-edit" onclick="openEditModal('${e.id}')">Edit</button>
-                                    <button class="btn-delete" onclick="deleteExpense('${e.id}')">Delete</button>
-                                </div>
+            if (Object.keys(groups).length === 0) { list.innerHTML = '<div class="empty">No active expenses</div>'; return; }
+
+            list.innerHTML = Object.entries(groups).map(([person, data], idx) => `
+                <div class="group-accordion">
+                    <button class="group-accordion-header" onclick="toggleGroup(this)">
+                        <div>
+                            <div>👤 ${person}</div>
+                            <div class="group-meta" style="margin-top:4px;">
+                                <span class="meta-spent">Spent: ₹${data.total.toFixed(2)}</span>
+                                ${data.owed > 0 ? `<span class="meta-owed">Owes: ₹${data.owed.toFixed(2)}</span>` : ''}
                             </div>
                         </div>
-                    `).join('')}
+                        <span class="g-arrow">▼</span>
+                    </button>
+                    <div class="group-accordion-body">
+                        ${data.list.map(e => {
+                            const owed = calculateOwed(e);
+                            return `
+                                <div class="expense-item">
+                                    <div class="expense-details">
+                                        <div class="expense-header">
+                                            <span class="badge badge-category">${e.category}</span>
+                                            ${e.isShared ? '<span class="badge badge-shared">🔀 Split</span>' : ''}
+                                        </div>
+                                        <div style="font-weight:600;">${e.description || 'No description'}</div>
+                                        <div style="font-size:0.85em;color:#6b7280;">${new Date(e.date).toLocaleDateString()}</div>
+                                    </div>
+                                    <div style="text-align:right;">
+                                        <div class="expense-amount">₹${e.amount.toFixed(2)}</div>
+                                        ${owed > 0 ? `<div class="expense-owed">Owes: ₹${owed.toFixed(2)}</div>` : ''}
+                                        <div style="margin-top:8px;">
+                                            <button class="btn-settle" onclick="settleExpense('${e.id}')">✓ Settle</button>
+                                            <button class="btn-edit" onclick="openEditModal('${e.id}')">Edit</button>
+                                            <button class="btn-delete" onclick="deleteExpense('${e.id}')">Delete</button>
+                                        </div>
+                                    </div>
+                                </div>`;
+                        }).join('')}
+                    </div>
                 </div>
             `).join('');
         }
 
         function renderByMonth(list) {
+            const active = expenses.filter(e => !e.settled);
             const groups = {};
-            expenses.forEach(e => {
+            active.forEach(e => {
                 const month = e.date.substring(0, 7);
-                if (!groups[month]) groups[month] = {list: [], total: 0};
+                if (!groups[month]) groups[month] = {list: [], total: 0, owed: 0};
                 groups[month].list.push(e);
                 groups[month].total += e.amount;
+                groups[month].owed += calculateOwed(e);
             });
 
+            if (Object.keys(groups).length === 0) { list.innerHTML = '<div class="empty">No active expenses</div>'; return; }
+
             list.innerHTML = Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0])).map(([month, data]) => {
-                const date = new Date(month + '-01');
-                const monthName = date.toLocaleDateString('en-US', {month: 'long', year: 'numeric'});
+                const monthName = new Date(month + '-01').toLocaleDateString('en-US', {month: 'long', year: 'numeric'});
                 return `
-                    <div style="margin-bottom: 24px;">
-                        <div style="background: #ecfdf5; padding: 14px; border-radius: 10px; margin-bottom: 10px;">
-                            <strong style="color: #065f46;">📅 ${monthName}</strong>
-                            <span style="float: right; font-size: 1.2em; font-weight: 800; color: #059669;">₹${data.total.toFixed(2)}</span>
+                <div class="group-accordion">
+                    <button class="group-accordion-header" onclick="toggleGroup(this)">
+                        <div>
+                            <div>📅 ${monthName}</div>
+                            <div class="group-meta" style="margin-top:4px;">
+                                <span class="meta-spent">Spent: ₹${data.total.toFixed(2)}</span>
+                                ${data.owed > 0 ? `<span class="meta-owed">Owes: ₹${data.owed.toFixed(2)}</span>` : ''}
+                            </div>
                         </div>
+                        <span class="g-arrow">▼</span>
+                    </button>
+                    <div class="group-accordion-body">
                         ${data.list.map(e => {
                             const owed = calculateOwed(e);
                             return `
@@ -1069,22 +1225,22 @@
                                             <span class="badge badge-category">${e.category}</span>
                                             ${e.isShared ? '<span class="badge badge-shared">🔀 Split</span>' : ''}
                                         </div>
-                                        <div style="font-weight: 600;">${e.description || 'No description'}</div>
-                                        <div style="font-size: 0.85em; color: #6b7280;">${new Date(e.date).toLocaleDateString()}</div>
+                                        <div style="font-weight:600;">${e.description || 'No description'}</div>
+                                        <div style="font-size:0.85em;color:#6b7280;">${new Date(e.date).toLocaleDateString()}</div>
                                     </div>
-                                    <div style="text-align: right;">
+                                    <div style="text-align:right;">
                                         <div class="expense-amount">₹${e.amount.toFixed(2)}</div>
-                                        ${owed > 0 ? `<div class="expense-owed">Owed: ₹${owed.toFixed(2)}</div>` : ''}
-                                        <div style="margin-top: 8px;">
+                                        ${owed > 0 ? `<div class="expense-owed">Owes: ₹${owed.toFixed(2)}</div>` : ''}
+                                        <div style="margin-top:8px;">
+                                            <button class="btn-settle" onclick="settleExpense('${e.id}')">✓ Settle</button>
                                             <button class="btn-edit" onclick="openEditModal('${e.id}')">Edit</button>
                                             <button class="btn-delete" onclick="deleteExpense('${e.id}')">Delete</button>
                                         </div>
                                     </div>
-                                </div>
-                            `;
+                                </div>`;
                         }).join('')}
                     </div>
-                `;
+                </div>`;
             }).join('');
         }
 
