@@ -1,4 +1,4 @@
-const CACHE_NAME = 'trackit-v2';
+const CACHE_NAME = 'trackit-v3';
 const urlsToCache = [
   '/TrackIT/',
   '/TrackIT/index.html',
