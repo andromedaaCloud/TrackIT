@@ -5,7 +5,7 @@
   "start_url": "/TrackIT/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#66bb6a",
+  "theme_color": "#FF6B6B",
   "orientation": "portrait-primary",
   "icons": [
     {
