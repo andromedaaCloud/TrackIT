@@ -292,6 +292,7 @@
             font-weight:700; cursor:pointer; color:var(--text-dark);
             display:flex; justify-content:space-between; align-items:center;
             font-family:'DM Sans',sans-serif; font-size:1em; transition:background 0.2s;
+            user-select: none;
         }
         .group-accordion-header:hover { background:var(--peach); }
         .group-accordion-header.open { background:linear-gradient(135deg,var(--coral) 0%,var(--amber) 100%); color:white; }
@@ -957,7 +958,7 @@
 
             list.innerHTML = Object.entries(personGroups).map(([person, data]) => `
                 <div class="group-accordion">
-                    <button class="group-accordion-header" onclick="toggleGroup(this)">
+                    <div class="group-accordion-header" onclick="toggleGroup(this)">
                         <div>
                             <div>👤 ${person}</div>
                             <div class="group-meta" style="margin-top:4px;">
@@ -974,7 +975,7 @@
                             </button>` : ''}
                             <span class="g-arrow">▼</span>
                         </div>
-                    </button>
+                    </div>
                     <div class="group-accordion-body">
                         ${data.list.map(e => {
                             const owed = calculateOwed(e);
