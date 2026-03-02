@@ -495,6 +495,14 @@
                     </select>
                 </div>
 
+                <!-- Person Selector (only shown when By Person is selected) -->
+                <div id="personFilterWrap" style="display:none; margin-bottom:14px;">
+                    <div style="font-size:0.78em; font-weight:700; color:var(--text-soft); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Filter by Person</div>
+                    <select id="personSelect" onchange="renderExpenses(); updateStats();" style="width:100%; padding:12px 14px; border:2px solid var(--peach); border-radius:12px; font-size:1em; font-family:'DM Sans',sans-serif; font-weight:700; color:var(--text-mid); background:var(--cream); cursor:pointer;">
+                        <option value="">👥 All Persons</option>
+                    </select>
+                </div>
+
                 <!-- Date Filter -->
                 <div style="display:flex; gap:10px; align-items:flex-end; margin-bottom:14px; flex-wrap:wrap;">
                     <div style="flex:1; min-width:130px;">
@@ -823,10 +831,15 @@
         let filterTo = null;
 
         function getFilteredExpenses() {
+            const selectedPerson = document.getElementById('personSelect') ? document.getElementById('personSelect').value : '';
             return expenses.filter(e => {
                 if (e.settled) return false;
                 if (filterFrom && e.date < filterFrom) return false;
                 if (filterTo && e.date > filterTo) return false;
+                if (selectedPerson && currentView === 'person') {
+                    const person = e.splitWith || 'Just you';
+                    if (person !== selectedPerson) return false;
+                }
                 return true;
             });
         }
@@ -868,8 +881,35 @@
 
         function switchView(view) {
             currentView = view;
+
+            // Show/hide person selector
+            const personWrap = document.getElementById('personFilterWrap');
+            if (view === 'person') {
+                personWrap.style.display = 'block';
+                populatePersonSelect();
+            } else {
+                personWrap.style.display = 'none';
+                document.getElementById('personSelect').value = '';
+            }
+
             updateStats();
             renderExpenses();
+        }
+
+        function populatePersonSelect() {
+            const active = expenses.filter(e => !e.settled);
+            const people = [...new Set(active.map(e => e.splitWith || 'Just you').filter(p => p !== 'Just you'))];
+            const select = document.getElementById('personSelect');
+            const current = select.value;
+            select.innerHTML = '<option value="">👥 All Persons</option>';
+            people.sort().forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p;
+                opt.textContent = '👤 ' + p;
+                select.appendChild(opt);
+            });
+            // Restore selection if still valid
+            if (people.includes(current)) select.value = current;
         }
 
         function renderExpenses() {
@@ -1108,13 +1148,15 @@
 
             // Build filename reflecting current view and date range
             let suffix = currentView;
+            const selectedPerson = document.getElementById('personSelect') ? document.getElementById('personSelect').value : '';
+            if (selectedPerson) suffix += `_${selectedPerson.replace(/\s+/g, '_')}`;
             if (filterFrom || filterTo) {
                 const from = filterFrom || 'start';
                 const to = filterTo || 'today';
                 suffix += `_${from}_to_${to}`;
             }
 
-            const rows = [['Date', 'Description', 'Category', 'Split With', 'Total Amount (₹)', 'Your Share (₹)', 'They Owe You (₹)', 'Shared', 'Status']];
+            const rows = [['Date', 'Description', 'Category', 'Split With', 'Total Amount (INR)', 'Your Share (INR)', 'They Owe You (INR)', 'Shared', 'Status']];
 
             filtered.forEach(e => {
                 const people = e.splitWith ? e.splitWith.split(',').map(p => p.trim()).filter(Boolean) : [];
@@ -1139,7 +1181,7 @@
             });
 
             const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
-            const blob = new Blob([csv], {type: 'text/csv'});
+            const blob = new Blob(['\uFEFF' + csv], {type: 'text/csv;charset=utf-8;'});
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
