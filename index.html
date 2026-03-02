@@ -1102,18 +1102,50 @@
         });
 
         function downloadCSV() {
-            if (expenses.length === 0) return alert('No expenses');
-            const rows = [['Date', 'Amount', 'Split With', 'Category', 'Description', 'Shared']];
-            expenses.forEach(e => rows.push([
-                e.date, e.amount, e.splitWith || '', e.category, e.description || '', e.isShared ? 'Yes' : 'No'
-            ]));
+            // Use same filtered expenses as current view - excludes settled & respects date filter
+            const filtered = getFilteredExpenses();
+            if (filtered.length === 0) return alert('No expenses to download for current selection');
+
+            // Build filename reflecting current view and date range
+            let suffix = currentView;
+            if (filterFrom || filterTo) {
+                const from = filterFrom || 'start';
+                const to = filterTo || 'today';
+                suffix += `_${from}_to_${to}`;
+            }
+
+            const rows = [['Date', 'Description', 'Category', 'Split With', 'Total Amount (₹)', 'Your Share (₹)', 'They Owe You (₹)', 'Shared', 'Status']];
+
+            filtered.forEach(e => {
+                const people = e.splitWith ? e.splitWith.split(',').map(p => p.trim()).filter(Boolean) : [];
+                const owed = calculateOwed(e);
+
+                let yourShare = e.amount;
+                if (people.length > 0 && e.isShared) {
+                    yourShare = e.amount / (people.length + 1);
+                }
+
+                rows.push([
+                    e.date,
+                    e.description || 'No description',
+                    e.category,
+                    e.splitWith || 'Just you',
+                    e.amount.toFixed(2),
+                    yourShare.toFixed(2),
+                    owed > 0 ? owed.toFixed(2) : '0.00',
+                    e.isShared ? 'Yes' : 'No',
+                    'Active'
+                ]);
+            });
+
             const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
             const blob = new Blob([csv], {type: 'text/csv'});
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `trackit_${new Date().toISOString().split('T')[0]}.csv`;
+            a.download = `trackit_${suffix}_${new Date().toISOString().split('T')[0]}.csv`;
             a.click();
+            URL.revokeObjectURL(url);
         }
 
         // PWA
